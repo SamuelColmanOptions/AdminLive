@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admin call matinal</title>
+  <link rel="shortcut icon" href="images/logo.png" type="image/x-icon">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial;
+      background-color: #0F2A29; /* fundo do site */
+      color: #FFFFFF; /* cor padrão do texto */
+    }
+  </style>
+</head>
+<body class="min-h-screen grid place-items-center p-4">
+  <div class="w-full max-w-lg bg-[#122D32] shadow-xl rounded-2xl p-6 space-y-6">
+
+    <header class="text-center space-y-3">
+        <!-- Logo centralizada -->
+        <img src="images/logo_transparente.png" alt="Logo da Empresa" class="mx-auto w-26 h-24 object-contain" />
+
+        <h1 class="text-xl font-semibold">Link da Live</h1>
+    </header>
+
+
+    <!-- LOGIN -->
+    <section id="loginBox" class="space-y-3">
+      <input id="email" type="email" placeholder="E-mail"
+             class="w-full border rounded-lg px-3 py-2 outline-none text-black" />
+      <input id="password" type="password" placeholder="Senha"
+             class="w-full border rounded-lg px-3 py-2 outline-none text-black" />
+      <button id="btnLogin"
+              class="w-full bg-black text-white font-semibold py-2 rounded-lg hover:opacity-90">
+        Entrar
+      </button>
+      <p id="loginError" class="text-red-400 text-sm hidden"></p>
+    </section>
+
+    <!-- FORM -->
+    <section id="formBox" class="hidden space-y-4">
+      <div class="flex items-center justify-between text-sm">
+        <span>Logado como <b id="who"></b></span>
+        <button id="btnLogout" class="underline hover:opacity-80">Sair</button>
+      </div>
+
+      <label class="text-sm font-medium">URL da Live (YouTube)</label>
+      <input id="liveUrl" type="url" placeholder="https://www.youtube.com/live/..."
+             class="w-full border rounded-lg px-3 py-2 outline-none text-black" />
+
+      <div class="flex items-center gap-2">
+        <button id="btnSalvar"
+                class="flex-1 bg-emerald-600 text-white font-semibold py-2 rounded-lg hover:opacity-90">
+          Salvar
+        </button>
+        <button id="btnTeste"
+                class="flex-1 bg-slate-800 text-white font-semibold py-2 rounded-lg hover:opacity-90"
+                title="Abrir link em nova aba">
+          Testar
+        </button>
+      </div>
+
+      <p id="status" class="text-sm opacity-80"></p>
+    </section>
+
+  </div>
+
+  <!-- Firebase SDKs (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAFRVLZ3D61q8ZPg8Rc4vsW2M2HBvsgjVI",
+      authDomain: "linklive-21263.firebaseapp.com",
+      projectId: "linklive-21263",
+      storageBucket: "linklive-21263.firebasestorage.app",
+      messagingSenderId: "844610005512",
+      appId: "1:844610005512:web:e961547220843b6e063fbd",
+      measurementId: "G-2CX1GPW3B8"
+    };
+
+    const DOC_PATH = 'linkdata/Lms6k3L6gIKOMmwUSKIU';
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    const loginBox = document.getElementById('loginBox');
+    const formBox  = document.getElementById('formBox');
+    const whoEl    = document.getElementById('who');
+
+    const emailEl  = document.getElementById('email');
+    const passEl   = document.getElementById('password');
+    const loginErr = document.getElementById('loginError');
+
+    const urlEl    = document.getElementById('liveUrl');
+    const statusEl = document.getElementById('status');
+
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        loginBox.classList.add('hidden');
+        formBox.classList.remove('hidden');
+        whoEl.textContent = user.email || user.uid;
+
+        try {
+          const doc = await db.doc(DOC_PATH).get();
+          if (doc.exists && doc.data()?.url) {
+            urlEl.value = doc.data().url;
+          } else {
+            urlEl.value = '';
+          }
+        } catch (e) {
+          statusEl.textContent = 'Erro ao carregar: ' + e.message;
+        }
+      } else {
+        formBox.classList.add('hidden');
+        loginBox.classList.remove('hidden');
+        whoEl.textContent = '';
+        urlEl.value = '';
+      }
+    });
+
+    document.getElementById('btnLogin').onclick = async () => {
+      loginErr.classList.add('hidden');
+      try {
+        await auth.signInWithEmailAndPassword(
+          emailEl.value.trim(),
+          passEl.value.trim()
+        );
+      } catch (e) {
+        loginErr.textContent = e.message;
+        loginErr.classList.remove('hidden');
+      }
+    };
+
+    document.getElementById('btnLogout').onclick = () => auth.signOut();
+
+    function isLikelyYouTube(u){
+      try{
+        const { hostname } = new URL(u);
+        return hostname.includes('youtube.com') || hostname.includes('youtu.be');
+      }catch(e){ return false; }
+    }
+
+    document.getElementById('btnSalvar').onclick = async () => {
+      const url = urlEl.value.trim();
+      if (!url) { statusEl.textContent = 'Informe a URL.'; return; }
+      if (!isLikelyYouTube(url)) {
+        statusEl.textContent = 'URL não parece do YouTube. Confirme.';
+        return;
+      }
+
+      statusEl.textContent = 'Salvando...';
+      try{
+        await db.doc(DOC_PATH).set({ url }, { merge: true });
+        statusEl.textContent = 'Salvo com sucesso! O site do viewer já reflete a alteração.';
+      }catch(e){
+        statusEl.textContent = 'Erro ao salvar: ' + e.message;
+      }
+    };
+
+    document.getElementById('btnTeste').onclick = () => {
+      const url = urlEl.value.trim();
+      if (url) window.open(url, '_blank');
+    };
+  </script>
+</body>
+</html>
